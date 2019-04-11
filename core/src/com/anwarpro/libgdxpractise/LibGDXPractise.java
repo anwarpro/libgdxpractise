@@ -2,114 +2,116 @@ package com.anwarpro.libgdxpractise;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.input.GestureDetector;
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.TimeUtils;
+
+import aurelienribon.tweenengine.Tween;
+import aurelienribon.tweenengine.TweenEquations;
+import aurelienribon.tweenengine.TweenManager;
 
 public class LibGDXPractise extends ApplicationAdapter {
-    static final int WORLD_WIDTH = 100;
-    static final int WORLD_HEIGHT = 100;
-
-    private OrthographicCamera cam;
+    private OrthographicCamera camera;
     private SpriteBatch batch;
-
-    private Sprite mapSprite;
-    private float rotationSpeed;
+    private Texture texture;
+    private Texture CircTxt, ElasticTxt, QuadTxt; //** text **//
+    private Sprite sprite1, sprite2, sprite3;
+    private TweenManager manager1, manager2, manager3;
+    private long startTime;
+    private long delta;
+    private float w, h;
 
     @Override
     public void create() {
-        rotationSpeed = 0.5f;
+        w = Gdx.graphics.getWidth();
+        h = Gdx.graphics.getHeight();
 
-        mapSprite = new Sprite(new Texture(Gdx.files.internal("sc_map.png")));
-        mapSprite.setPosition(0, 0);
-        mapSprite.setSize(WORLD_WIDTH, WORLD_HEIGHT);
-
-        float w = Gdx.graphics.getWidth();
-        float h = Gdx.graphics.getHeight();
-
-        // Constructs a new OrthographicCamera, using the given viewport width and height
-        // Height is multiplied by aspect ratio.
-        cam = new OrthographicCamera(30, 30 * (h / w));
-
-        cam.position.set(cam.viewportWidth / 2f, cam.viewportHeight / 2f, 0);
-        cam.update();
-
+        camera = new OrthographicCamera();
+        camera.setToOrtho(false, 400, 625);
         batch = new SpriteBatch();
-        Gdx.input.setOnscreenKeyboardVisible(true);
+
+        texture = new Texture("circle.png");
+        texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        CircTxt = new Texture("circleTxt.png");
+        CircTxt.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        ElasticTxt = new Texture("circleTxt.png");
+        ElasticTxt.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        QuadTxt = new Texture("circleTxt.png");
+        QuadTxt.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+
+        sprite1 = new Sprite(texture);
+        sprite1.setPosition(50, 0.25f * h);
+
+        sprite2 = new Sprite(sprite1); //** sprite2 identical to sprite1 **//
+        sprite2.setY(0.5f * h);   //** except for the y position **//
+
+        sprite3 = new Sprite(sprite1); //** sprite3 identical to sprite1 **//
+        sprite3.setY(0.75f * h);  //** except for the y position **//
+
+        Tween.registerAccessor(Sprite.class, new SpriteTween());
+        manager1 = new TweenManager();
+        Tween.to(sprite1, SpriteTween.POSITION_X, 1000f) //** tween POSITION_X for a duration **//
+                .target(w - 100) // ** final POSITION_X **//
+                .ease(TweenEquations.easeInOutQuad) //** easing equation **//
+                .repeat(10, 1000f) //** ten more times **//
+                .start(manager1); //** start it
+        manager2 = new TweenManager();
+        Tween.to(sprite2, SpriteTween.POSITION_X, 1000f) //** tween POSITION_X for a duration **//
+                .target(w - 100) // ** final POSITION_X **//
+                .ease(TweenEquations.easeInOutCirc) //** easing equation **//
+                .repeat(10, 1000f) //** ten more times **//
+                .start(manager2);
+        manager3 = new TweenManager();
+        Tween.to(sprite3, SpriteTween.POSITION_X, 1000f) // ** tween POSITION_X for a duration **/
+                .target(w - 100) // ** final POSITION_X **//
+                .ease(TweenEquations.easeInOutElastic) //** easing equation **//
+                .repeat(10, 1000f) //** ten more times **//
+                .start(manager3);
+        startTime = TimeUtils.millis();
+    }
+
+
+    @Override
+    public void dispose() {
+        batch.dispose();
+        texture.dispose();
+        //font.dispose();
     }
 
     @Override
     public void render() {
-        handleInput();
-        cam.update();
-        batch.setProjectionMatrix(cam.combined);
-
+        Gdx.gl.glClearColor(0, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
+        delta = (TimeUtils.millis() - startTime) / 1000; // **get time delta **//
+        manager1.update(delta); //** update sprite1 **//
+        manager2.update(delta); //** update sprite2 **//
+        manager3.update(delta); //** update sprite3 **//
+        batch.setProjectionMatrix(camera.combined);
         batch.begin();
-        mapSprite.draw(batch);
+        batch.draw(ElasticTxt, 150, 0.75f * h + 50);
+        batch.draw(CircTxt, 150, 0.5f * h + 50);
+        batch.draw(QuadTxt, 150, 0.25f * h + 50);
+        sprite1.draw(batch);
+        sprite2.draw(batch);
+        sprite3.draw(batch);
         batch.end();
-    }
-
-    private void handleInput() {
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) {
-            cam.zoom += 0.02;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.Q)) {
-            cam.zoom -= 0.02;
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
-            cam.translate(-3, 0, 0);
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
-            cam.translate(3, 0, 0);
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.DOWN)) {
-            cam.translate(0, -3, 0);
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.UP)) {
-            cam.translate(0, 3, 0);
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) {
-            cam.rotate(-rotationSpeed, 0, 0, 1);
-        }
-        if (Gdx.input.isKeyPressed(Input.Keys.E)) {
-            cam.rotate(rotationSpeed, 0, 0, 1);
-        }
-
-        cam.zoom = MathUtils.clamp(cam.zoom, 0.1f, 100 / cam.viewportWidth);
-
-        float effectiveViewportWidth = cam.viewportWidth * cam.zoom;
-        float effectiveViewportHeight = cam.viewportHeight * cam.zoom;
-
-        cam.position.x = MathUtils.clamp(cam.position.x, effectiveViewportWidth / 2f, 100 - effectiveViewportWidth / 2f);
-        cam.position.y = MathUtils.clamp(cam.position.y, effectiveViewportHeight / 2f, 100 - effectiveViewportHeight / 2f);
     }
 
     @Override
     public void resize(int width, int height) {
-        cam.viewportWidth = 30f;
-        cam.viewportHeight = 30f * height / width;
-        cam.update();
-    }
-
-    @Override
-    public void resume() {
-    }
-
-    @Override
-    public void dispose() {
-        mapSprite.getTexture().dispose();
-        batch.dispose();
     }
 
     @Override
     public void pause() {
+    }
+
+    @Override
+    public void resume() {
     }
 }
