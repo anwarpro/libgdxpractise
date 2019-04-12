@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.input.GestureDetector;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -26,7 +27,7 @@ import aurelienribon.tweenengine.Tween;
 import aurelienribon.tweenengine.TweenEquations;
 import aurelienribon.tweenengine.TweenManager;
 
-public class LibGDXPractise extends ApplicationAdapter implements InputProcessor, ContactListener {
+public class LibGDXPractise extends ApplicationAdapter implements GestureDetector.GestureListener, ContactListener {
 
     public static final int WORLD_W = 400;
     public static final int WORLD_H = 625;
@@ -75,9 +76,9 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
     }
 
     private void preload() {
-        ballSprite = new Sprite(new Texture(Gdx.files.internal("images/ball.png")));
+        ballSprite = new Sprite(new Texture(Gdx.files.internal("images/ball.png")), 0, 0, 120, 120);
         hoopTex = new Texture(Gdx.files.internal("images/hoop.png"));
-        hoopSprite = new Sprite(hoopTex, 88, 62);
+        hoopSprite = new Sprite(hoopTex);
         sideRimSprite = new Sprite(new Texture(Gdx.files.internal("images/side_rim.png")));
         frontRimSprite = new Sprite(new Texture(Gdx.files.internal("images/front_rim.png")));
 
@@ -144,7 +145,7 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
         ball = world.createBody(bodyDef);
 
         CircleShape circleShape = new CircleShape();
-        circleShape.setRadius(BALL_RADIS / 16f);
+        circleShape.setRadius(60 / 16f);
 
         ball.createFixture(circleShape, 0);
         ball.setAwake(false);
@@ -153,12 +154,12 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
         ballData.setBellowHoop(false);
 
         ball.setUserData(ballData);
-        Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100)
-                .target(36 / 16f)
+        ball.getFixtureList().get(0).getShape().setRadius(60 / 16f);
+        Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100)
+                .target(60 / 16f)
                 .ease(TweenEquations.easeNone)
                 .start(manager);
-        Gdx.input.setInputProcessor(this);
-
+        Gdx.input.setInputProcessor(new GestureDetector(this));
     }
 
     @Override
@@ -168,11 +169,11 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
 
     @Override
     public void render() {
-
-        manager.update(Gdx.graphics.getDeltaTime());
         camera.update();
 
-        Gdx.gl.glClearColor(0, 0, 0, 1);
+        manager.update(Gdx.graphics.getDeltaTime());
+
+        Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         if (ball.getLinearVelocity().y > 0) {
@@ -199,6 +200,27 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
             createBall();
         }
 
+        batch.setProjectionMatrix(camera.combined);
+
+        batch.begin();
+
+        batch.draw(hoopSprite, 88 / 16f, 62 / 16f, 244 / 16f, 147 / 16f);
+
+        batch.draw(sideRimSprite, left_rim.getPosition().x - (2.5f / 16f) / 2f,
+                left_rim.getPosition().y - (2.5f / 16f) / 2f,
+                5 / 16f, 5 / 16f);
+
+        batch.draw(sideRimSprite, right_rim.getPosition().x - (2.5f / 16f) / 2f,
+                right_rim.getPosition().y - (2.5f / 16f) / 2f,
+                5 / 16f, 5 / 16f);
+
+        batch.draw(frontRimSprite, 148 / 16f, 182 / 16f, 104 / 16f, 6 / 16f);
+
+        batch.draw(ballSprite, ball.getPosition().x - (60 / 16f) / 2f,
+                ball.getPosition().y - (60 / 16f) / 2f,
+                60 / 16f, 60 / 16f);
+        batch.end();
+
         debugRender.render(world, camera.combined);
         world.step(1 / 60f, 100, 100);
 
@@ -217,47 +239,6 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
     public void resume() {
     }
 
-    @Override
-    public boolean keyDown(int keycode) {
-        return false;
-    }
-
-    @Override
-    public boolean keyUp(int keycode) {
-        return false;
-    }
-
-    @Override
-    public boolean keyTyped(char character) {
-        return false;
-    }
-
-    @Override
-    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-        boolean bodies = ball.getFixtureList().get(0).testPoint(screenX / 16f, screenY / 16f);
-        if (bodies) {
-            start_location = new Vector2(screenX / 16f, screenY / 16f);
-            isDown = true;
-        }
-        return false;
-    }
-
-    @Override
-    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-        if (isDown) {
-            isDown = false;
-            end_location = new Vector2(screenX / 16f, screenY / 16f);
-
-            if (end_location.y < start_location.y) {
-                Vector2 slope = new Vector2(end_location.x - start_location.x, end_location.y - start_location.y);
-
-                float x_traj = -2300 * slope.x / slope.y;
-                launch(x_traj);
-            }
-        }
-        return false;
-    }
-
     private void launch(float x_traj) {
 
         if (!ballData.isLunched()) {
@@ -266,8 +247,9 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
             ballData.setLunched(true);
             world.setGravity(new Vector2(0, 3000 / 16f));
 
-            Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 500)
-                    .target(60 / 16f)
+            ball.getFixtureList().get(0).getShape().setRadius(60 / 16f);
+            Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 500)
+                    .target(36 / 16f)
                     .ease(TweenEquations.easeNone)
                     .start(manager);
 
@@ -280,20 +262,6 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
 
     }
 
-    @Override
-    public boolean touchDragged(int screenX, int screenY, int pointer) {
-        return false;
-    }
-
-    @Override
-    public boolean mouseMoved(int screenX, int screenY) {
-        return false;
-    }
-
-    @Override
-    public boolean scrolled(int amount) {
-        return false;
-    }
 
     private void hitRim() {
         backboard.play();
@@ -316,6 +284,53 @@ public class LibGDXPractise extends ApplicationAdapter implements InputProcessor
 
     @Override
     public void postSolve(Contact contact, ContactImpulse impulse) {
+
+    }
+
+    @Override
+    public boolean touchDown(float x, float y, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean tap(float x, float y, int count, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean longPress(float x, float y) {
+        return false;
+    }
+
+    @Override
+    public boolean fling(float velocityX, float velocityY, int button) {
+        float x_traj = -2300 * velocityX / velocityY;
+        launch(x_traj);
+        return false;
+    }
+
+    @Override
+    public boolean pan(float x, float y, float deltaX, float deltaY) {
+        return false;
+    }
+
+    @Override
+    public boolean panStop(float x, float y, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean zoom(float initialDistance, float distance) {
+        return false;
+    }
+
+    @Override
+    public boolean pinch(Vector2 initialPointer1, Vector2 initialPointer2, Vector2 pointer1, Vector2 pointer2) {
+        return false;
+    }
+
+    @Override
+    public void pinchStop() {
 
     }
 }
