@@ -3,13 +3,15 @@ package com.anwarpro.libgdxpractise;
 import com.anwarpro.libgdxpractise.entity.BallData;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.input.GestureDetector;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
@@ -22,6 +24,8 @@ import com.badlogic.gdx.physics.box2d.ContactListener;
 import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.Manifold;
 import com.badlogic.gdx.physics.box2d.World;
+
+import java.util.Random;
 
 import aurelienribon.tweenengine.Tween;
 import aurelienribon.tweenengine.TweenEquations;
@@ -66,13 +70,32 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     private Sprite sideRimSprite;
     private Sprite frontRimSprite;
 
+    private Sprite[] basket = new Sprite[4];
+
     private Sprite win[] = new Sprite[5];
     private Sprite lose[] = new Sprite[5];
     private SpriteBatch batch;
     private Texture hoopTex;
+    private boolean draw;
+    private Tween moveInTween;
+    private Tween fadeInTween;
+
+    private Sprite emoji;
+    private Tween ballSizeTween;
+    private Tween ballThrowTween;
+
+    private int score = 0;
+    private int hit = 0;
+
+    private BitmapFont font;
+
+    private OrthographicCamera cameraUI;
+
+    private boolean success = false;
 
     public LibGDXPractise() {
         Tween.registerAccessor(CircleShape.class, new CircleShapeAccessor());
+        Tween.registerAccessor(Sprite.class, new SpriteTween());
     }
 
     private void preload() {
@@ -83,11 +106,18 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         frontRimSprite = new Sprite(new Texture(Gdx.files.internal("images/front_rim.png")));
 
         for (int i = 0; i < 5; i++) {
-            win[i] = new Sprite(new Texture(Gdx.files.internal("images/win" + i + ".png")));
+            win[i] = new Sprite(new Texture(Gdx.files.internal("images/win" + i + ".png")), 160, 160);
+            win[i].flip(false, true);
         }
 
         for (int i = 0; i < 5; i++) {
-            lose[i] = new Sprite(new Texture(Gdx.files.internal("images/lose" + i + ".png")));
+            lose[i] = new Sprite(new Texture(Gdx.files.internal("images/lose" + i + ".png")), 160, 160);
+            lose[i].flip(false, true);
+        }
+
+        for (int i = 0; i < 4; i++) {
+            basket[i] = new Sprite(new Texture(Gdx.files.internal("images/basket/" + i + ".png")), 82, 177);
+            basket[i].flip(false, true);
         }
     }
 
@@ -99,7 +129,16 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         world = new World(new Vector2(0, -9.8f), true);
         camera = new OrthographicCamera();
         camera.setToOrtho(true, WORLD_W / 16f, WORLD_H / 16f);
+        cameraUI = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         debugRender = new Box2DDebugRenderer();
+
+        FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("font/font.ttf"));
+
+        FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
+        parameter.size = 18;
+        parameter.color = Color.BLACK;
+
+        font = generator.generateFont(parameter);
 
         batch = new SpriteBatch();
 
@@ -141,6 +180,15 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     }
 
     private void createBall() {
+
+        if (ballSizeTween != null) {
+            ballSizeTween.kill();
+        }
+
+        if (ballThrowTween != null) {
+            ballThrowTween.kill();
+        }
+
         spawn.play();
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyDef.BodyType.DynamicBody;
@@ -158,10 +206,60 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
         ball.setUserData(ballData);
 
-        Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 10 / 16f)
-                .target(60 / 16f)
+        ballSizeTween = Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 10 / 16f)
+                .target(36 / 16f)
                 .ease(TweenEquations.easeNone)
                 .start(manager);
+
+    }
+
+    private void drawReset() {
+        batch.setProjectionMatrix(cameraUI.combined);
+        font.draw(batch, "Your Score: " + score, -10, 0);
+        font.draw(batch, "Touch anywhere to restart", -(Gdx.graphics.getWidth() / 2f) / 2f, -20);
+    }
+
+    private void drawGame() {
+        batch.setProjectionMatrix(camera.combined);
+        batch.draw(hoopSprite, 88 / 16f, 62 / 16f, 244 / 16f, 147 / 16f);
+
+        if (draw) {
+            batch.draw(emoji, emoji.getX(), emoji.getY(), 60 / 16f, 60 / 16f);
+            if (moveInTween.isFinished()) {
+                draw = false;
+            }
+        }
+
+        batch.draw(sideRimSprite, left_rim.getPosition().x - (2.5f / 16f) / 2f,
+                left_rim.getPosition().y - (2.5f / 16f) / 2f,
+                5 / 16f, 5 / 16f);
+
+        batch.draw(sideRimSprite, right_rim.getPosition().x - (2.5f / 16f) / 2f,
+                right_rim.getPosition().y - (2.5f / 16f) / 2f,
+                5 / 16f, 5 / 16f);
+
+
+        float ballArea = ball.getFixtureList().get(0).getShape().getRadius() * 2;
+
+        batch.draw(ballSprite, ball.getPosition().x - ballArea / 2f,
+                ball.getPosition().y - ballArea / 2f,
+                ballArea, ballArea);
+
+        if (ball.getLinearVelocity().y > 0) {
+            batch.draw(frontRimSprite, 148 / 16f, 182 / 16f, 104 / 16f, 6 / 16f);
+        }
+
+        batch.draw(basket[hit], 0, 300 / 16f, 82 / 16f, 177 / 16f);
+
+        if (draw) {
+            batch.setProjectionMatrix(cameraUI.combined);
+            if (success) {
+                font.draw(batch, "Score: " + score, 0, 0);
+            } else {
+                font.draw(batch, "Opps!", 0, 0);
+            }
+            batch.setProjectionMatrix(camera.combined);
+        }
     }
 
     @Override
@@ -172,33 +270,46 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     @Override
     public void render() {
         camera.update();
+        cameraUI.update();
 
         manager.update(Gdx.graphics.getDeltaTime());
 
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        if (ball.getLinearVelocity().y > 0) {
-            BodyDef bodyDef = new BodyDef();
-            bodyDef.type = BodyDef.BodyType.StaticBody;
-            bodyDef.position.set(148 / 16f, 182 / 16f);
-            front_rim = world.createBody(bodyDef);
-        }
-
-        batch.setProjectionMatrix(camera.combined);
-
-        batch.begin();
-
         if (ball.getLinearVelocity().y > 0 && ball.getPosition().y > 188 / 16 && !ballData.isBellowHoop()) {
             ballData.setBellowHoop(true);
             ball.setAwake(true);
             if (ball.getPosition().x > 151 / 16f && ball.getPosition().x < 249 / 16f) {
-                batch.draw(win[0], 0, 0);
+
+                emoji = win[(new Random().nextInt((4 - 0) + 1))];
+
+                draw = true;
+                emoji.setPosition(180 / 16f, 100 / 16f);
+                moveInTween = Tween.from(emoji, SpriteTween.POSITION_Y, 1f)
+                        .target(150 / 16f)
+                        .ease(TweenEquations.easeInOutElastic)
+                        .start(manager);
+
+                score++;
+                success = true;
+
                 score_sound.play();
+                hit++;
             } else {
-                batch.draw(lose[0], 0, 0);
+                emoji = lose[(new Random().nextInt((4) + 1))];
+
+                draw = true;
+                emoji.setPosition(180 / 16f, 100 / 16f);
+                moveInTween = Tween.from(emoji, SpriteTween.POSITION_Y, 1f)
+                        .target(150 / 16f)
+                        .ease(TweenEquations.easeInOutElastic)
+                        .start(manager);
+                success = false;
                 fail.play();
+                hit++;
             }
+
         }
 
         if (ball.getPosition().y > 1200 / 16f) {
@@ -207,26 +318,26 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
             createBall();
         }
 
+        batch.setProjectionMatrix(camera.combined);
 
-        batch.draw(hoopSprite, 88 / 16f, 62 / 16f, 244 / 16f, 147 / 16f);
+        batch.begin();
 
-        batch.draw(sideRimSprite, left_rim.getPosition().x - (2.5f / 16f) / 2f,
-                left_rim.getPosition().y - (2.5f / 16f) / 2f,
-                5 / 16f, 5 / 16f);
+        //draw game
 
-        batch.draw(sideRimSprite, right_rim.getPosition().x - (2.5f / 16f) / 2f,
-                right_rim.getPosition().y - (2.5f / 16f) / 2f,
-                5 / 16f, 5 / 16f);
+        if (hit == 3) {
+            drawReset();
+            drawGame();
+        } else {
+            drawGame();
+        }
 
-        batch.draw(frontRimSprite, 148 / 16f, 182 / 16f, 104 / 16f, 6 / 16f);
-
-        batch.draw(ballSprite, ball.getPosition().x - (60 / 16f) / 2f,
-                ball.getPosition().y - (60 / 16f) / 2f,
-                60 / 16f, 60 / 16f);
         batch.end();
 
-        debugRender.render(world, camera.combined);
+        if (hit != 3) {
+            debugRender.render(world, camera.combined);
+        }
         world.step(1 / 60f, 100, 100);
+
 
     }
 
@@ -251,8 +362,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
             ballData.setLunched(true);
             world.setGravity(new Vector2(0, 3000 / 16f));
 
-            ball.getFixtureList().get(0).getShape().setRadius(60 / 16f);
-            Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100 / 16f)
+            ballThrowTween = Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100 / 16f)
                     .target(36 / 16f)
                     .ease(TweenEquations.easeNone)
                     .start(manager);
@@ -293,6 +403,11 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
     @Override
     public boolean touchDown(float x, float y, int pointer, int button) {
+        if (hit == 3) {
+            hit = 0;
+            score = 0;
+            draw = false;
+        }
         return false;
     }
 
@@ -309,7 +424,9 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     @Override
     public boolean fling(float velocityX, float velocityY, int button) {
         float x_traj = -2300 / 16f * velocityX / velocityY;
-        launch(x_traj);
+        if (hit != 3) {
+            launch(x_traj);
+        }
         return false;
     }
 
