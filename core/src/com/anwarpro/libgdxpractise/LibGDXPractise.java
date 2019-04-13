@@ -92,6 +92,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     private OrthographicCamera cameraUI;
 
     private boolean success = false;
+    private boolean readyForThrow;
 
     public LibGDXPractise() {
         Tween.registerAccessor(CircleShape.class, new CircleShapeAccessor());
@@ -152,7 +153,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         //texture
 
         BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyDef.BodyType.StaticBody;
+        bodyDef.type = BodyDef.BodyType.KinematicBody;
         bodyDef.position.set(150 / 16f, 184 / 16f);
         left_rim = world.createBody(bodyDef);
 
@@ -206,7 +207,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
         ball.setUserData(ballData);
 
-        ballSizeTween = Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 10 / 16f)
+        ballSizeTween = Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 2 / 16f)
                 .target(36 / 16f)
                 .ease(TweenEquations.easeNone)
                 .start(manager);
@@ -265,6 +266,13 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     @Override
     public void dispose() {
         world.dispose();
+        batch.dispose();
+        font.dispose();
+        fail.dispose();
+        whoosh.dispose();
+        backboard.dispose();
+        spawn.dispose();
+        score_sound.dispose();
     }
 
     @Override
@@ -277,10 +285,15 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        if (ball.getLinearVelocity().y > 0 && ball.getPosition().y > 188 / 16 && !ballData.isBellowHoop()) {
+        if (ball.getLinearVelocity().y > 0 && ball.getPosition().y > 188 / 16f && !ballData.isBellowHoop()) {
+
             ballData.setBellowHoop(true);
             ball.setAwake(true);
-            if (ball.getPosition().x > 151 / 16f && ball.getPosition().x < 249 / 16f) {
+
+            right_rim.setAwake(true);
+            left_rim.setAwake(true);
+
+            if (ball.getPosition().x > 151 / 16f && ball.getPosition().x < 249 / 16f && ball.getPosition().y > left_rim.getPosition().y) {
 
                 emoji = win[(new Random().nextInt((4 - 0) + 1))];
 
@@ -310,6 +323,9 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
                 hit++;
             }
 
+        } else if (!ballData.isBellowHoop()) {
+            right_rim.setAwake(false);
+            left_rim.setAwake(false);
         }
 
         if (ball.getPosition().y > 1200 / 16f) {
@@ -336,6 +352,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         if (hit != 3) {
             debugRender.render(world, camera.combined);
         }
+
         world.step(1 / 60f, 100, 100);
 
 
@@ -424,6 +441,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
     @Override
     public boolean fling(float velocityX, float velocityY, int button) {
         float x_traj = -2300 / 16f * velocityX / velocityY;
+        Gdx.app.log("Ready", "" + readyForThrow);
         if (hit != 3) {
             launch(x_traj);
         }
