@@ -122,6 +122,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.shape = circleShape;
+        fixtureDef.restitution = 0.63f;
         left_rim.createFixture(fixtureDef);
 
         bodyDef.position.set(249 / 16f, 184 / 16f);
@@ -134,6 +135,8 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
         //ball
         createBall();
+
+        Gdx.input.setInputProcessor(new GestureDetector(this));
 
     }
 
@@ -154,12 +157,11 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
         ballData.setBellowHoop(false);
 
         ball.setUserData(ballData);
-        ball.getFixtureList().get(0).getShape().setRadius(60 / 16f);
-        Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100)
+
+        Tween.to(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 10 / 16f)
                 .target(60 / 16f)
                 .ease(TweenEquations.easeNone)
                 .start(manager);
-        Gdx.input.setInputProcessor(new GestureDetector(this));
     }
 
     @Override
@@ -183,13 +185,18 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
             front_rim = world.createBody(bodyDef);
         }
 
+        batch.setProjectionMatrix(camera.combined);
+
+        batch.begin();
+
         if (ball.getLinearVelocity().y > 0 && ball.getPosition().y > 188 / 16 && !ballData.isBellowHoop()) {
             ballData.setBellowHoop(true);
             ball.setAwake(true);
-            float rand = (float) Math.floor(Math.random() * 5);
             if (ball.getPosition().x > 151 / 16f && ball.getPosition().x < 249 / 16f) {
+                batch.draw(win[0], 0, 0);
                 score_sound.play();
             } else {
+                batch.draw(lose[0], 0, 0);
                 fail.play();
             }
         }
@@ -200,9 +207,6 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
             createBall();
         }
 
-        batch.setProjectionMatrix(camera.combined);
-
-        batch.begin();
 
         batch.draw(hoopSprite, 88 / 16f, 62 / 16f, 244 / 16f, 147 / 16f);
 
@@ -248,7 +252,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
             world.setGravity(new Vector2(0, 3000 / 16f));
 
             ball.getFixtureList().get(0).getShape().setRadius(60 / 16f);
-            Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 500)
+            Tween.from(ball.getFixtureList().get(0).getShape(), CircleShapeAccessor.TYPE_RADIAS, 100 / 16f)
                     .target(36 / 16f)
                     .ease(TweenEquations.easeNone)
                     .start(manager);
@@ -304,7 +308,7 @@ public class LibGDXPractise extends ApplicationAdapter implements GestureDetecto
 
     @Override
     public boolean fling(float velocityX, float velocityY, int button) {
-        float x_traj = -2300 * velocityX / velocityY;
+        float x_traj = -2300 / 16f * velocityX / velocityY;
         launch(x_traj);
         return false;
     }
